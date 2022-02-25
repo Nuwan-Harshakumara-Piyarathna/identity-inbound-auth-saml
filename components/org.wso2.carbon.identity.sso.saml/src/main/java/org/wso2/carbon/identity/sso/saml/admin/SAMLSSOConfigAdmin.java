@@ -34,16 +34,20 @@ import org.wso2.carbon.identity.sp.metadata.saml2.exception.InvalidMetadataExcep
 import org.wso2.carbon.identity.sp.metadata.saml2.util.Parser;
 import org.wso2.carbon.identity.sso.saml.Error;
 import org.wso2.carbon.identity.sso.saml.SSOServiceProviderConfigManager;
+import org.wso2.carbon.identity.sso.saml.dao.JDBCSAMLSSOAppDAO;
 import org.wso2.carbon.identity.sso.saml.dto.SAMLSSOServiceProviderDTO;
 import org.wso2.carbon.identity.sso.saml.dto.SAMLSSOServiceProviderInfoDTO;
+import org.wso2.carbon.identity.sso.saml.exception.ArtifactBindingException;
 import org.wso2.carbon.identity.sso.saml.exception.IdentitySAML2ClientException;
 import org.wso2.carbon.identity.sso.saml.internal.IdentitySAMLSSOServiceComponent;
+import org.wso2.carbon.identity.sso.saml.model.SAMLSSO_Model;
 import org.wso2.carbon.identity.sso.saml.util.SAMLSSOUtil;
 import org.wso2.carbon.registry.core.Registry;
 import org.wso2.carbon.registry.core.session.UserRegistry;
 
 import java.security.KeyStore;
 import java.security.cert.CertificateException;
+import java.util.*;
 
 import static org.wso2.carbon.identity.sso.saml.Error.CONFLICTING_SAML_ISSUER;
 import static org.wso2.carbon.identity.sso.saml.Error.INVALID_REQUEST;
@@ -73,23 +77,23 @@ public class SAMLSSOConfigAdmin {
     public boolean addRelyingPartyServiceProvider(SAMLSSOServiceProviderDTO serviceProviderDTO) throws IdentityException {
 
         SAMLSSOServiceProviderDO serviceProviderDO = createSAMLSSOServiceProviderDO(serviceProviderDTO);
-        IdentityPersistenceManager persistenceManager = IdentityPersistenceManager
-                .getPersistanceManager();
         try {
+            JDBCSAMLSSOAppDAO jdbcsamlssoAppDAO = new JDBCSAMLSSOAppDAO();
             String issuer = getIssuerWithQualifier(serviceProviderDO);
-            SAMLSSOServiceProviderDO samlssoServiceProviderDO = SSOServiceProviderConfigManager.getInstance().
-                    getServiceProvider(issuer);
 
-            if (samlssoServiceProviderDO != null) {
+            SAMLSSO_Model existingSamlSsoServiceProvider = jdbcsamlssoAppDAO.findSAMLServiceProvider(issuer);
+
+            if (existingSamlSsoServiceProvider != null) {
                 String message = "A Service Provider with the name " + issuer + " is already loaded" +
                         " from the file system.";
                 log.error(message);
                 return false;
             }
-            return persistenceManager.addServiceProvider(registry, serviceProviderDO);
-        } catch (IdentityException e) {
-            String message = "Error obtaining a registry for adding a new service provider";
-            throw new IdentityException(message, e);
+            List<SAMLSSO_Model> list = convertServiceProviderToList(serviceProviderDTO);
+            jdbcsamlssoAppDAO.addSAMLServiceProvider(list);
+            return true;
+        }  catch (ArtifactBindingException e) {
+            throw new RuntimeException(e);
         }
     }
 
@@ -408,7 +412,7 @@ public class SAMLSSOConfigAdmin {
      *
      * @return set of RP Service Providers + file path of pub. key of generated key pair
      */
-    public SAMLSSOServiceProviderInfoDTO getServiceProviders() throws IdentityException {
+        public SAMLSSOServiceProviderInfoDTO getServiceProviders_old() throws IdentityException {
         SAMLSSOServiceProviderDTO[] serviceProviders = null;
         try {
             IdentityPersistenceManager persistenceManager = IdentityPersistenceManager
@@ -492,6 +496,34 @@ public class SAMLSSOConfigAdmin {
         return serviceProviderInfoDTO;
     }
 
+    public SAMLSSOServiceProviderInfoDTO getServiceProviders() throws IdentityException {
+        SAMLSSOServiceProviderDTO[] serviceProviders = null;
+        JDBCSAMLSSOAppDAO jdbcsamlssoAppDAO = new JDBCSAMLSSOAppDAO();
+        ArrayList<SAMLSSO_Model> list = jdbcsamlssoAppDAO.getAllServiceProviders();
+        HashMap<String,SAMLSSOServiceProviderDTO> map = new HashMap<>();
+        for(SAMLSSO_Model item: list){
+            if(map.containsKey(item.getIssuer_name())){
+                SAMLSSOServiceProviderDTO samlssoServiceProviderDTO = map.get(item.getIssuer_name());
+                samlssoServiceProviderDTO.setDoSignAssertions(true);
+                map.put(item.getIssuer_name(), updateServiceProviderDTO(samlssoServiceProviderDTO,item));
+            }
+            else {
+                SAMLSSOServiceProviderDTO samlssoServiceProviderDTO = new SAMLSSOServiceProviderDTO();
+                map.put(item.getIssuer_name(), updateServiceProviderDTO(samlssoServiceProviderDTO,item));
+            }
+        }
+        serviceProviders = map.values().toArray(new SAMLSSOServiceProviderDTO[0]);
+
+        SAMLSSOServiceProviderInfoDTO serviceProviderInfoDTO = new SAMLSSOServiceProviderInfoDTO();
+        serviceProviderInfoDTO.setServiceProviders(serviceProviders);
+
+        //if it is tenant zero
+        if (registry.getTenantId() == 0) {
+            serviceProviderInfoDTO.setTenantZero(true);
+        }
+        return serviceProviderInfoDTO;
+    }
+
     /**
      * Remove an existing service provider.
      *
@@ -501,16 +533,202 @@ public class SAMLSSOConfigAdmin {
      */
     public boolean removeServiceProvider(String issuer) throws IdentityException {
         try {
-            IdentityPersistenceManager persistenceManager = IdentityPersistenceManager.getPersistanceManager();
-            return persistenceManager.removeServiceProvider(registry, issuer);
-        } catch (IdentityException e) {
-            throw new IdentityException("Error removing a Service Provider with issuer: " + issuer, e);
+//            IdentityPersistenceManager persistenceManager = IdentityPersistenceManager.getPersistanceManager();
+            JDBCSAMLSSOAppDAO jdbcsamlssoAppDAO = new JDBCSAMLSSOAppDAO();
+            jdbcsamlssoAppDAO.removeServiceProvider(issuer);
+//            return persistenceManager.removeServiceProvider(registry, issuer);
+            return true;
+        } catch (ArtifactBindingException e) {
+            throw new RuntimeException(e);
         }
     }
 
     protected String getTenantDomain() {
 
         return CarbonContext.getThreadLocalCarbonContext().getTenantDomain();
+    }
+
+    public List<SAMLSSO_Model> convertServiceProviderToList(SAMLSSOServiceProviderDTO serviceProviderDTO) {
+        List<SAMLSSO_Model> list = new ArrayList<>();
+        list.add(new SAMLSSO_Model(serviceProviderDTO.getIssuer(),"issuer",serviceProviderDTO.getIssuer(),registry.getTenantId()));
+        list.add(new SAMLSSO_Model(serviceProviderDTO.getIssuer(),"issuerQualifier",serviceProviderDTO.getIssuerQualifier(),registry.getTenantId()));
+        for(String url : serviceProviderDTO.getAssertionConsumerUrls()){
+            list.add(new SAMLSSO_Model(serviceProviderDTO.getIssuer(),"assertionConsumerUrls",url,registry.getTenantId()));
+        }
+        list.add(new SAMLSSO_Model(serviceProviderDTO.getIssuer(),"defaultAssertionConsumerUrl",serviceProviderDTO.getDefaultAssertionConsumerUrl(),registry.getTenantId()));
+        list.add(new SAMLSSO_Model(serviceProviderDTO.getIssuer(),"signingAlgorithmURI",serviceProviderDTO.getSigningAlgorithmURI(),registry.getTenantId()));
+        list.add(new SAMLSSO_Model(serviceProviderDTO.getIssuer(),"digestAlgorithmURI",serviceProviderDTO.getDigestAlgorithmURI(),registry.getTenantId()));
+        list.add(new SAMLSSO_Model(serviceProviderDTO.getIssuer(),"assertionEncryptionAlgorithmURI",serviceProviderDTO.getAssertionEncryptionAlgorithmURI(),registry.getTenantId()));
+        list.add(new SAMLSSO_Model(serviceProviderDTO.getIssuer(),"keyEncryptionAlgorithmURI",serviceProviderDTO.getKeyEncryptionAlgorithmURI(),registry.getTenantId()));
+        list.add(new SAMLSSO_Model(serviceProviderDTO.getIssuer(),"certAlias",serviceProviderDTO.getCertAlias(),registry.getTenantId()));
+        list.add(new SAMLSSO_Model(serviceProviderDTO.getIssuer(),"attributeConsumingServiceIndex",serviceProviderDTO.getAttributeConsumingServiceIndex(),registry.getTenantId()));
+        list.add(new SAMLSSO_Model(serviceProviderDTO.getIssuer(),"doSignResponse",serviceProviderDTO.isDoSignResponse() ? "true":"false",registry.getTenantId()));
+        list.add(new SAMLSSO_Model(serviceProviderDTO.getIssuer(),"doSingleLogout",serviceProviderDTO.isDoSingleLogout() ? "true":"false",registry.getTenantId()));
+        list.add(new SAMLSSO_Model(serviceProviderDTO.getIssuer(),"doFrontChannelLogout",serviceProviderDTO.isDoFrontChannelLogout() ? "true":"false",registry.getTenantId()));
+        list.add(new SAMLSSO_Model(serviceProviderDTO.getIssuer(),"frontChannelLogoutBinding",serviceProviderDTO.getFrontChannelLogoutBinding(),registry.getTenantId()));
+        list.add(new SAMLSSO_Model(serviceProviderDTO.getIssuer(),"isAssertionQueryRequestProfileEnabled",serviceProviderDTO.isAssertionQueryRequestProfileEnabled() ? "true":"false",registry.getTenantId()));
+        list.add(new SAMLSSO_Model(serviceProviderDTO.getIssuer(),"supportedAssertionQueryRequestTypes",serviceProviderDTO.getSupportedAssertionQueryRequestTypes(),registry.getTenantId()));
+        list.add(new SAMLSSO_Model(serviceProviderDTO.getIssuer(),"enableSAML2ArtifactBinding",serviceProviderDTO.isEnableSAML2ArtifactBinding() ? "true":"false",registry.getTenantId()));
+        list.add(new SAMLSSO_Model(serviceProviderDTO.getIssuer(),"doValidateSignatureInArtifactResolve",serviceProviderDTO.isDoValidateSignatureInArtifactResolve() ? "true":"false",registry.getTenantId()));
+        list.add(new SAMLSSO_Model(serviceProviderDTO.getIssuer(),"loginPageURL",serviceProviderDTO.getLoginPageURL(),registry.getTenantId()));
+        list.add(new SAMLSSO_Model(serviceProviderDTO.getIssuer(),"sloResponseURL",serviceProviderDTO.getSloResponseURL(),registry.getTenantId()));
+        list.add(new SAMLSSO_Model(serviceProviderDTO.getIssuer(),"sloRequestURL",serviceProviderDTO.getSloRequestURL(),registry.getTenantId()));
+        for(String claim : serviceProviderDTO.getRequestedClaims()){
+            list.add(new SAMLSSO_Model(serviceProviderDTO.getIssuer(),"requestedClaims",claim,registry.getTenantId()));
+        }
+        for(String audience : serviceProviderDTO.getRequestedAudiences()){
+            list.add(new SAMLSSO_Model(serviceProviderDTO.getIssuer(),"requestedAudiences",audience,registry.getTenantId()));
+        }
+        for(String recipient : serviceProviderDTO.getRequestedRecipients()){
+            list.add(new SAMLSSO_Model(serviceProviderDTO.getIssuer(),"requestedRecipients",recipient,registry.getTenantId()));
+        }
+        list.add(new SAMLSSO_Model(serviceProviderDTO.getIssuer(),"enableAttributesByDefault",serviceProviderDTO.isEnableAttributesByDefault() ? "true":"false",registry.getTenantId()));
+        list.add(new SAMLSSO_Model(serviceProviderDTO.getIssuer(),"nameIdClaimUri",serviceProviderDTO.getNameIdClaimUri(),registry.getTenantId()));
+        list.add(new SAMLSSO_Model(serviceProviderDTO.getIssuer(),"nameIDFormat",serviceProviderDTO.getNameIDFormat(),registry.getTenantId()));
+        list.add(new SAMLSSO_Model(serviceProviderDTO.getIssuer(),"idPInitSSOEnabled",serviceProviderDTO.isIdPInitSSOEnabled()?"true":"false",registry.getTenantId()));
+        list.add(new SAMLSSO_Model(serviceProviderDTO.getIssuer(),"idPInitSLOEnabled",serviceProviderDTO.isIdPInitSLOEnabled()?"true":"false",registry.getTenantId()));
+        for(String url : serviceProviderDTO.getIdpInitSLOReturnToURLs()){
+            list.add(new SAMLSSO_Model(serviceProviderDTO.getIssuer(),"idpInitSLOReturnToURLs",url,registry.getTenantId()));
+        }
+        list.add(new SAMLSSO_Model(serviceProviderDTO.getIssuer(),"doEnableEncryptedAssertion",serviceProviderDTO.isDoEnableEncryptedAssertion()?"true":"false",registry.getTenantId()));
+        list.add(new SAMLSSO_Model(serviceProviderDTO.getIssuer(),"doValidateSignatureInRequests",serviceProviderDTO.isDoValidateSignatureInRequests()?"true":"false",registry.getTenantId()));
+
+        list.add(new SAMLSSO_Model(serviceProviderDTO.getIssuer(),"idpEntityIDAlias",serviceProviderDTO.getIdpEntityIDAlias(),registry.getTenantId()));
+
+
+        return list;
+    }
+
+    private SAMLSSOServiceProviderDTO updateServiceProviderDTO(SAMLSSOServiceProviderDTO samlssoServiceProviderDTO, SAMLSSO_Model item) {
+        switch (item.getKey_name()){
+            case "issuer":
+                samlssoServiceProviderDTO.setIssuer(item.getValue_name());
+                break;
+            case "issuerQualifier":
+                samlssoServiceProviderDTO.setIssuerQualifier(item.getValue_name());
+                break;
+            case "assertionConsumerUrls":
+                String[] arr = samlssoServiceProviderDTO.getAssertionConsumerUrls();
+                ArrayList<String> list = (ArrayList<String>) Arrays.asList(arr);
+                list.add(item.getValue_name());
+                samlssoServiceProviderDTO.setAssertionConsumerUrls(list.toArray(new String[0]));
+                break;
+            case "defaultAssertionConsumerUrl":
+                samlssoServiceProviderDTO.setDefaultAssertionConsumerUrl(item.getValue_name());
+                break;
+            case "signingAlgorithmURI":
+                samlssoServiceProviderDTO.setSigningAlgorithmURI(item.getValue_name());
+                break;
+            case "digestAlgorithmURI":
+                samlssoServiceProviderDTO.setDigestAlgorithmURI(item.getValue_name());
+                break;
+            case "assertionEncryptionAlgorithmURI":
+                samlssoServiceProviderDTO.setAssertionEncryptionAlgorithmURI(item.getValue_name());
+                break;
+            case "keyEncryptionAlgorithmURI":
+                samlssoServiceProviderDTO.setKeyEncryptionAlgorithmURI(item.getValue_name());
+                break;
+            case "certAlias":
+                samlssoServiceProviderDTO.setCertAlias(item.getValue_name());
+                break;
+            case "attributeConsumingServiceIndex":
+                samlssoServiceProviderDTO.setAttributeConsumingServiceIndex(item.getValue_name());
+                if (StringUtils.isNotBlank(item.getValue_name())) {
+                    samlssoServiceProviderDTO.setEnableAttributeProfile(true);
+                }
+                break;
+            case "doSignResponse":
+                samlssoServiceProviderDTO.setDoSignResponse(item.getValue_name().equals("true"));
+                break;
+            case "doSingleLogout":
+                samlssoServiceProviderDTO.setDoSingleLogout(item.getValue_name().equals("true"));
+                break;
+            case "doFrontChannelLogout":
+                samlssoServiceProviderDTO.setDoFrontChannelLogout(item.getValue_name().equals("true"));
+                break;
+            case "frontChannelLogoutBinding":
+                samlssoServiceProviderDTO.setFrontChannelLogoutBinding(item.getValue_name());
+                break;
+            case "isAssertionQueryRequestProfileEnabled":
+                samlssoServiceProviderDTO.setAssertionQueryRequestProfileEnabled(item.getValue_name().equals("true"));
+                break;
+            case "supportedAssertionQueryRequestTypes":
+                samlssoServiceProviderDTO.setSupportedAssertionQueryRequestTypes(item.getValue_name());
+                break;
+            case "enableSAML2ArtifactBinding":
+                samlssoServiceProviderDTO.setEnableSAML2ArtifactBinding(item.getValue_name().equals("true"));
+                break;
+            case "doValidateSignatureInArtifactResolve":
+                samlssoServiceProviderDTO.setDoValidateSignatureInArtifactResolve(item.getValue_name().equals("true"));
+                break;
+            case "loginPageURL":
+                if(item.getValue_name() == null || item.getValue_name().equals("null")){
+                    samlssoServiceProviderDTO.setLoginPageURL("");
+                }
+                else{
+                    samlssoServiceProviderDTO.setLoginPageURL(item.getValue_name());
+                }
+                break;
+            case "sloResponseURL":
+                samlssoServiceProviderDTO.setSloResponseURL(item.getValue_name());
+                break;
+            case "sloRequestURL":
+                samlssoServiceProviderDTO.setSloRequestURL(item.getValue_name());
+                break;
+            case "requestedClaims":
+                String[] requestedClaimsArray = samlssoServiceProviderDTO.getRequestedClaims();
+                ArrayList<String> requestedClaimsList = (ArrayList<String>) Arrays.asList(requestedClaimsArray);
+                requestedClaimsList.add(item.getValue_name());
+                samlssoServiceProviderDTO.setAssertionConsumerUrls(requestedClaimsList.toArray(new String[0]));
+                break;
+            case "requestedAudiences":
+                String[] requestedAudiencesArray = samlssoServiceProviderDTO.getRequestedAudiences();
+                ArrayList<String> requestedAudiencesList = (ArrayList<String>) Arrays.asList(requestedAudiencesArray);
+                requestedAudiencesList.add(item.getValue_name());
+                samlssoServiceProviderDTO.setAssertionConsumerUrls(requestedAudiencesList.toArray(new String[0]));
+                break;
+            case "requestedRecipients":
+                String[] requestedRecipientsArray = samlssoServiceProviderDTO.getRequestedRecipients();
+                ArrayList<String> requestedRecipientsList = (ArrayList<String>) Arrays.asList(requestedRecipientsArray);
+                requestedRecipientsList.add(item.getValue_name());
+                samlssoServiceProviderDTO.setAssertionConsumerUrls(requestedRecipientsList.toArray(new String[0]));
+                break;
+            case "enableAttributesByDefault":
+                samlssoServiceProviderDTO.setEnableAttributesByDefault(item.getValue_name().equals("true"));
+                break;
+            case "nameIdClaimUri":
+                samlssoServiceProviderDTO.setNameIdClaimUri(item.getValue_name());
+                break;
+            case "nameIDFormat":
+                samlssoServiceProviderDTO.setNameIDFormat(item.getValue_name());
+                if (samlssoServiceProviderDTO.getNameIDFormat() == null) {
+                    samlssoServiceProviderDTO.setNameIDFormat(NameIdentifier.EMAIL);
+                }
+                samlssoServiceProviderDTO.setNameIDFormat(samlssoServiceProviderDTO.getNameIDFormat().replace(":", "/"));
+                break;
+            case "idPInitSSOEnabled":
+                samlssoServiceProviderDTO.setIdPInitSSOEnabled(item.getValue_name().equals("true"));
+                break;
+            case "idPInitSLOEnabled":
+                samlssoServiceProviderDTO.setIdPInitSLOEnabled(item.getValue_name().equals("true"));
+                break;
+            case "idpInitSLOReturnToURLs":
+                String[] idpInitSLOReturnToURLsArray = samlssoServiceProviderDTO.getIdpInitSLOReturnToURLs();
+                ArrayList<String> idpInitSLOReturnToURLsList = (ArrayList<String>) Arrays.asList(idpInitSLOReturnToURLsArray);
+                idpInitSLOReturnToURLsList.add(item.getValue_name());
+                samlssoServiceProviderDTO.setAssertionConsumerUrls(idpInitSLOReturnToURLsList.toArray(new String[0]));
+                break;
+            case "doEnableEncryptedAssertion":
+                samlssoServiceProviderDTO.setDoEnableEncryptedAssertion(item.getValue_name().equals("true"));
+                break;
+            case "doValidateSignatureInRequests":
+                samlssoServiceProviderDTO.setDoValidateSignatureInRequests(item.getValue_name().equals("true"));
+                break;
+            case "idpEntityIDAlias":
+                samlssoServiceProviderDTO.setIdpEntityIDAlias(item.getValue_name());
+                break;
+        }
+        return samlssoServiceProviderDTO;
     }
 
 }
