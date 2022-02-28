@@ -1,6 +1,5 @@
 package org.wso2.carbon.identity.sso.saml.dao;
 
-import org.springframework.jdbc.core.ResultSetExtractor;
 import org.wso2.carbon.consent.mgt.core.util.JdbcUtils;
 import org.wso2.carbon.database.utils.jdbc.JdbcTemplate;
 import org.wso2.carbon.database.utils.jdbc.RowMapper;
@@ -14,6 +13,8 @@ import java.util.ArrayList;
 import java.util.List;
 
 public class JDBCSAMLSSOAppDAO {
+
+    //add a new service provider
     public void addSAMLServiceProvider(List<SAMLSSO_Model> list) throws ArtifactBindingException {
         JdbcTemplate jdbcTemplate = JdbcUtils.getNewTemplate();
         try {
@@ -31,11 +32,38 @@ public class JDBCSAMLSSOAppDAO {
         }
     }
 
+    //find SAML Service Provider Attributes by issuer name.Attributes are stored as key value pairs.It will return a list
+    public ArrayList<SAMLSSO_Model> findSAMLServiceProviderAttributes(String issuer) {
+        JdbcTemplate jdbcTemplate = JdbcUtils.getNewTemplate();
+        List<SAMLSSO_Model> list;
+        try {
+            list = jdbcTemplate.executeQuery(SQLQueries.JDBCSAMLSSODAOSQLQueries.GET_SAML_APP_ALL_ATTRIBUTES_BY_ISSUER_NAME, new RowMapper<SAMLSSO_Model>() {
+                        @Override
+                        public SAMLSSO_Model mapRow(ResultSet resultSet, int i) throws SQLException {
+                            return new SAMLSSO_Model(
+                                    resultSet.getInt(1),
+                                    resultSet.getString(2),
+                                    resultSet.getString(3),
+                                    resultSet.getString(4),
+                                    resultSet.getInt(5)
+                            );
+                        }
+                    },
+                    (preparedStatement -> preparedStatement.setString(1, issuer))
+            );
+        } catch (DataAccessException e) {
+            throw new RuntimeException(e);
+        }
+        return (ArrayList<SAMLSSO_Model>) list;
+    }
+
+    //find whether SAML Service Provider exists by issuer name.
+    //check for 1 attribute is enough
     public SAMLSSO_Model findSAMLServiceProvider(String issuer) throws ArtifactBindingException {
         JdbcTemplate jdbcTemplate = JdbcUtils.getNewTemplate();
         SAMLSSO_Model result;
         try {
-            result = jdbcTemplate.fetchSingleRecord(SQLQueries.JDBCSAMLSSODAOSQLQueries.GET_SAML_APP_BY_ISSUER_NAME, new RowMapper<SAMLSSO_Model>() {
+            result = jdbcTemplate.fetchSingleRecord(SQLQueries.JDBCSAMLSSODAOSQLQueries.GET_SAML_APP_SINGLE_ATTRIBUTE_BY_ISSUER_NAME, new RowMapper<SAMLSSO_Model>() {
                         @Override
                         public SAMLSSO_Model mapRow(ResultSet resultSet, int i) throws SQLException {
                             return new SAMLSSO_Model(
@@ -46,17 +74,14 @@ public class JDBCSAMLSSOAppDAO {
                                     resultSet.getInt(5));
                         }
                     },
-                    (preparedStatement -> {
-                        preparedStatement.setString(1, issuer);
-
-                    }));
+                    (preparedStatement -> preparedStatement.setString(1, issuer)));
         } catch (DataAccessException e) {
             throw new ArtifactBindingException("Error while retrieving SAML2 artifact information.", e);
         }
         return result;
     }
 
-
+    //remove saml service provider by issuer name
     public void removeServiceProvider(String issuer) throws ArtifactBindingException {
         JdbcTemplate jdbcTemplate = JdbcUtils.getNewTemplate();
         try {
@@ -68,6 +93,7 @@ public class JDBCSAMLSSOAppDAO {
         }
     }
 
+    //get all saml service providers
     public ArrayList<SAMLSSO_Model> getAllServiceProviders() {
         JdbcTemplate jdbcTemplate = JdbcUtils.getNewTemplate();
         List<SAMLSSO_Model> list;

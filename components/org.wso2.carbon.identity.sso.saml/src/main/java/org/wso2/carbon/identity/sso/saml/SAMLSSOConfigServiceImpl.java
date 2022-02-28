@@ -236,26 +236,15 @@ public class SAMLSSOConfigServiceImpl {
      */
     public SAMLSSOServiceProviderDTO getServiceProvider(String issuer) throws IdentityException {
 
-        try {
-            SAMLSSOConfigAdmin configAdmin = new SAMLSSOConfigAdmin(getConfigSystemRegistry());
-            SAMLSSOServiceProviderInfoDTO serviceProviders = configAdmin.getServiceProviders();
-
-            for (SAMLSSOServiceProviderDTO sp : serviceProviders.getServiceProviders()) {
-                if (StringUtils.equals(sp.getIssuer(), issuer)) {
-                    if (log.isDebugEnabled()) {
-                        log.debug("SAML SP found for issuer: " + issuer + " in tenantDomain: " + getTenantDomain());
-                    }
-                    return sp;
-                }
-            }
+        SAMLSSOConfigAdmin configAdmin = new SAMLSSOConfigAdmin(getConfigSystemRegistry());
+        SAMLSSOServiceProviderDTO sp = configAdmin.getServiceProviderByIssuer(issuer);
+        if(sp == null){
             if (log.isDebugEnabled()) {
                 log.debug("SAML SP not found for issuer: " + issuer + " in tenantDomain: " + getTenantDomain());
             }
             return null;
-        } catch (IdentityException ex) {
-            String msg = "Error retrieving SAML SP for issuer: " + issuer + " of tenantDomain: " + getTenantDomain();
-            throw handleException(msg, ex);
         }
+        return sp;
     }
 
     /**

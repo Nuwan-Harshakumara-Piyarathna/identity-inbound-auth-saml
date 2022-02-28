@@ -447,89 +447,6 @@ public class SAMLSSOConfigAdmin {
      *
      * @return set of RP Service Providers + file path of pub. key of generated key pair
      */
-        public SAMLSSOServiceProviderInfoDTO getServiceProviders_old() throws IdentityException {
-        SAMLSSOServiceProviderDTO[] serviceProviders = null;
-        try {
-            IdentityPersistenceManager persistenceManager = IdentityPersistenceManager
-                    .getPersistanceManager();
-            SAMLSSOServiceProviderDO[] providersSet = persistenceManager.getServiceProviders(registry);
-            serviceProviders = new SAMLSSOServiceProviderDTO[providersSet.length];
-
-            for (int i = 0; i < providersSet.length; i++) {
-                SAMLSSOServiceProviderDO providerDO = providersSet[i];
-                SAMLSSOServiceProviderDTO providerDTO = new SAMLSSOServiceProviderDTO();
-                providerDTO.setIssuer(providerDO.getIssuer());
-                providerDTO.setIssuerQualifier(providerDO.getIssuerQualifier());
-                providerDTO.setAssertionConsumerUrls(providerDO.getAssertionConsumerUrls());
-                providerDTO.setDefaultAssertionConsumerUrl(providerDO.getDefaultAssertionConsumerUrl());
-                providerDTO.setSigningAlgorithmURI(providerDO.getSigningAlgorithmUri());
-                providerDTO.setDigestAlgorithmURI(providerDO.getDigestAlgorithmUri());
-                providerDTO.setAssertionEncryptionAlgorithmURI(providerDO.getAssertionEncryptionAlgorithmUri());
-                providerDTO.setKeyEncryptionAlgorithmURI(providerDO.getKeyEncryptionAlgorithmUri());
-                providerDTO.setCertAlias(providerDO.getCertAlias());
-                providerDTO.setAttributeConsumingServiceIndex(providerDO.getAttributeConsumingServiceIndex());
-
-                if (StringUtils.isNotBlank(providerDO.getAttributeConsumingServiceIndex())) {
-                    providerDTO.setEnableAttributeProfile(true);
-                }
-
-                providerDTO.setDoSignResponse(providerDO.isDoSignResponse());
-                /*
-                According to the spec, "The <Assertion> element(s) in the <Response> MUST be signed". Therefore we
-                should not reply on any property to decide this behaviour. Hence the property is set to sign by default.
-                */
-                providerDTO.setDoSignAssertions(true);
-                providerDTO.setDoSingleLogout(providerDO.isDoSingleLogout());
-                providerDTO.setDoFrontChannelLogout(providerDO.isDoFrontChannelLogout());
-                providerDTO.setFrontChannelLogoutBinding(providerDO.getFrontChannelLogoutBinding());
-                providerDTO.setAssertionQueryRequestProfileEnabled(providerDO.isAssertionQueryRequestProfileEnabled());
-                providerDTO.setSupportedAssertionQueryRequestTypes(providerDO.getSupportedAssertionQueryRequestTypes());
-                providerDTO.setEnableSAML2ArtifactBinding(providerDO.isEnableSAML2ArtifactBinding());
-                providerDTO.setDoValidateSignatureInArtifactResolve(
-                        providerDO.isDoValidateSignatureInArtifactResolve());
-
-                if (providerDO.getLoginPageURL() == null || "null".equals(providerDO.getLoginPageURL())) {
-                    providerDTO.setLoginPageURL("");
-                } else {
-                    providerDTO.setLoginPageURL(providerDO.getLoginPageURL());
-                }
-
-                providerDTO.setSloResponseURL(providerDO.getSloResponseURL());
-                providerDTO.setSloRequestURL(providerDO.getSloRequestURL());
-                providerDTO.setRequestedClaims(providerDO.getRequestedClaims());
-                providerDTO.setRequestedAudiences(providerDO.getRequestedAudiences());
-                providerDTO.setRequestedRecipients(providerDO.getRequestedRecipients());
-                providerDTO.setEnableAttributesByDefault(providerDO.isEnableAttributesByDefault());
-                providerDTO.setNameIdClaimUri(providerDO.getNameIdClaimUri());
-                providerDTO.setNameIDFormat(providerDO.getNameIDFormat());
-
-                if (providerDTO.getNameIDFormat() == null) {
-                    providerDTO.setNameIDFormat(NameIdentifier.EMAIL);
-                }
-                providerDTO.setNameIDFormat(providerDTO.getNameIDFormat().replace(":", "/"));
-
-                providerDTO.setIdPInitSSOEnabled(providerDO.isIdPInitSSOEnabled());
-                providerDTO.setIdPInitSLOEnabled(providerDO.isIdPInitSLOEnabled());
-                providerDTO.setIdpInitSLOReturnToURLs(providerDO.getIdpInitSLOReturnToURLs());
-                providerDTO.setDoEnableEncryptedAssertion(providerDO.isDoEnableEncryptedAssertion());
-                providerDTO.setDoValidateSignatureInRequests(providerDO.isDoValidateSignatureInRequests());
-                providerDTO.setIdpEntityIDAlias(providerDO.getIdpEntityIDAlias());
-                serviceProviders[i] = providerDTO;
-            }
-        } catch (IdentityException e) {
-            String message = "Error obtaining a registry instance for reading service provider list";
-            throw new IdentityException(message, e);
-        }
-
-        SAMLSSOServiceProviderInfoDTO serviceProviderInfoDTO = new SAMLSSOServiceProviderInfoDTO();
-        serviceProviderInfoDTO.setServiceProviders(serviceProviders);
-
-        //if it is tenant zero
-        if (registry.getTenantId() == 0) {
-            serviceProviderInfoDTO.setTenantZero(true);
-        }
-        return serviceProviderInfoDTO;
-    }
 
     public SAMLSSOServiceProviderInfoDTO getServiceProviders() throws IdentityException {
         SAMLSSOServiceProviderDTO[] serviceProviders = null;
@@ -539,11 +456,15 @@ public class SAMLSSOConfigAdmin {
         for(SAMLSSO_Model item: list){
             if(map.containsKey(item.getIssuer_name())){
                 SAMLSSOServiceProviderDTO samlssoServiceProviderDTO = map.get(item.getIssuer_name());
-                samlssoServiceProviderDTO.setDoSignAssertions(true);
                 map.put(item.getIssuer_name(), updateServiceProviderDTO(samlssoServiceProviderDTO,item));
             }
             else {
                 SAMLSSOServiceProviderDTO samlssoServiceProviderDTO = new SAMLSSOServiceProviderDTO();
+                /*
+                According to the spec, "The <Assertion> element(s) in the <Response> MUST be signed". Therefore we should not
+                reply on any property to decide this behaviour. Hence the property is set to sign by default.
+                */
+                samlssoServiceProviderDTO.setDoSignAssertions(true);
                 map.put(item.getIssuer_name(), updateServiceProviderDTO(samlssoServiceProviderDTO,item));
             }
         }
@@ -568,10 +489,8 @@ public class SAMLSSOConfigAdmin {
      */
     public boolean removeServiceProvider(String issuer) throws IdentityException {
         try {
-//            IdentityPersistenceManager persistenceManager = IdentityPersistenceManager.getPersistanceManager();
             JDBCSAMLSSOAppDAO jdbcsamlssoAppDAO = new JDBCSAMLSSOAppDAO();
             jdbcsamlssoAppDAO.removeServiceProvider(issuer);
-//            return persistenceManager.removeServiceProvider(registry, issuer);
             return true;
         } catch (ArtifactBindingException e) {
             throw new RuntimeException(e);
@@ -766,4 +685,18 @@ public class SAMLSSOConfigAdmin {
         return samlssoServiceProviderDTO;
     }
 
+    public SAMLSSOServiceProviderDTO getServiceProviderByIssuer(String issuer) {
+        JDBCSAMLSSOAppDAO jdbcsamlssoAppDAO = new JDBCSAMLSSOAppDAO();
+        ArrayList<SAMLSSO_Model> list = jdbcsamlssoAppDAO.findSAMLServiceProviderAttributes(issuer);
+        //check for not found
+        if(list == null || list.size() == 0){
+            return null;
+        }
+        SAMLSSOServiceProviderDTO samlssoServiceProviderDTO = new SAMLSSOServiceProviderDTO();
+        samlssoServiceProviderDTO.setDoSignAssertions(true);
+        for(SAMLSSO_Model item: list){
+            updateServiceProviderDTO(samlssoServiceProviderDTO, item);
+        }
+        return samlssoServiceProviderDTO;
+    }
 }
