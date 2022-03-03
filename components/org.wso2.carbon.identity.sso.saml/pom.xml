@@ -22,7 +22,7 @@
         <groupId>org.wso2.carbon.identity.inbound.auth.saml2</groupId>
         <artifactId>identity-inbound-auth-saml</artifactId>
         <relativePath>../../pom.xml</relativePath>
-        <version>5.8.19</version>
+        <version>5.9.3-SNAPSHOT</version>
     </parent>
 
     <modelVersion>4.0.0</modelVersion>
@@ -368,10 +368,10 @@
                             org.apache.http.conn.ssl,
                             org.apache.http.impl.client,
                             org.apache.http.message,
-                            org.apache.xml.security ; version="[1.4.2.patched,2.0.0]",
-                            org.apache.xml.security.c14n ; version="[1.4.2.patched,2.0.0]",
-                            org.apache.xml.security.signature ; version="[1.4.2.patched,2.0.0]",
-                            org.apache.xml.security.utils ; version="[1.4.2.patched,2.0.0]",
+                            org.apache.xml.security ; version="${wss4j.xml.security.imp.pkg.version.range}",
+                            org.apache.xml.security.c14n ; version="${wss4j.xml.security.imp.pkg.version.range}",
+                            org.apache.xml.security.signature ; version="${wss4j.xml.security.imp.pkg.version.range}",
+                            org.apache.xml.security.utils ; version="${wss4j.xml.security.imp.pkg.version.range}",
                             org.opensaml.*; version="${opensaml3.wso2.osgi.version.range}",
                             net.shibboleth.utilities.java.support.*; version="${opensaml3.wso2.osgi.version.range}",
                             org.w3c.dom, org.w3c.dom.bootstrap,

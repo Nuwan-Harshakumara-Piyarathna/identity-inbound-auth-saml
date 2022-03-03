@@ -38,6 +38,7 @@ import org.wso2.carbon.identity.sso.saml.exception.IdentitySAML2ClientException;
 import org.wso2.carbon.identity.sso.saml.exception.IdentitySAML2SSOException;
 import org.wso2.carbon.identity.sso.saml.util.SAMLSSOUtil;
 import org.wso2.carbon.registry.core.Registry;
+import org.wso2.carbon.registry.core.exceptions.RegistryException;
 import org.wso2.carbon.security.SecurityConfigException;
 import org.wso2.carbon.security.keystore.KeyStoreAdmin;
 import org.wso2.carbon.security.keystore.service.KeyStoreData;
@@ -56,6 +57,7 @@ import java.util.function.Predicate;
 
 import static org.wso2.carbon.identity.sso.saml.Error.INVALID_REQUEST;
 import static org.wso2.carbon.identity.sso.saml.Error.UNEXPECTED_SERVER_ERROR;
+import static org.wso2.carbon.identity.sso.saml.Error.URL_NOT_FOUND;
 
 /**
  * Providers an OSGi service layer for SAML service provider configuration management operations.
@@ -133,8 +135,8 @@ public class SAMLSSOConfigServiceImpl {
 
     public SAMLSSOServiceProviderDTO uploadRPServiceProvider(String metadata) throws IdentitySAML2SSOException {
 
-        SAMLSSOConfigAdmin configAdmin = new SAMLSSOConfigAdmin(getConfigSystemRegistry());
         try {
+            SAMLSSOConfigAdmin configAdmin = new SAMLSSOConfigAdmin(getConfigSystemRegistry());
             if (log.isDebugEnabled()) {
                 log.debug("Creating SAML Service Provider with metadata: " + metadata);
             }
@@ -167,7 +169,8 @@ public class SAMLSSOConfigServiceImpl {
             return uploadRPServiceProvider(metadata);
         } catch (IOException e) {
             String tenantDomain = getTenantDomain();
-            throw handleIOException("Error while creating SAML service provider in tenantDomain: " + tenantDomain, e);
+            throw handleIOException(URL_NOT_FOUND, "Non-existing metadata URL for SAML service provider creation in tenantDomain: "
+                    + tenantDomain, e);
         } finally {
             IOUtils.closeQuietly(in);
         }
@@ -209,8 +212,8 @@ public class SAMLSSOConfigServiceImpl {
         return configValue;
     }
 
-    private IdentitySAML2SSOException handleIOException(String message, IOException e) {
-        return new IdentitySAML2SSOException(UNEXPECTED_SERVER_ERROR.getErrorCode(), message, e);
+    private IdentitySAML2SSOException handleIOException(Error error, String message, IOException e) {
+        return new IdentitySAML2ClientException(error.getErrorCode(), message, e);
     }
 
     /**
@@ -449,7 +452,18 @@ public class SAMLSSOConfigServiceImpl {
         return CarbonContext.getThreadLocalCarbonContext().getTenantDomain();
     }
 
-    private Registry getConfigSystemRegistry() {
+    private Registry getConfigSystemRegistry() throws IdentityException {
+
+        String tenantDomain = getTenantDomain();
+        try {
+            int tenantId = IdentityTenantUtil.getTenantId(tenantDomain);
+            IdentityTenantUtil.getTenantRegistryLoader().loadTenantRegistry(tenantId);
+            if (log.isDebugEnabled()) {
+                log.debug("Loading tenant registry for tenant domain: " + tenantDomain);
+            }
+        } catch (RegistryException e) {
+            throw new IdentityException("Error loading tenant registry for tenant domain " + tenantDomain, e);
+        }
 
         return (Registry) PrivilegedCarbonContext.getThreadLocalCarbonContext()
                 .getRegistry(RegistryType.SYSTEM_CONFIGURATION);

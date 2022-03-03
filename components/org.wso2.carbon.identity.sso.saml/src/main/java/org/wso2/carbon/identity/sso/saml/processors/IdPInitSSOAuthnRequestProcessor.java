@@ -113,11 +113,14 @@ public class IdPInitSSOAuthnRequestProcessor implements SSOAuthnRequestProcessor
             String sessionIndexId = null;
 
             if (isAuthenticated) {
-                if (sessionId != null && sessionPersistenceManager.isExistingTokenId(sessionId)) {
-                    sessionIndexId = sessionPersistenceManager.getSessionIndexFromTokenId(sessionId);
+                if (sessionId != null && sessionPersistenceManager.isExistingTokenId(sessionId,
+                        authnReqDTO.getLoggedInTenantDomain())) {
+                    sessionIndexId = sessionPersistenceManager.getSessionIndexFromTokenId(sessionId,
+                            authnReqDTO.getLoggedInTenantDomain());
                 } else {
                     sessionIndexId = UUIDGenerator.generateUUID();
-                    sessionPersistenceManager.persistSession(sessionId, sessionIndexId);
+                    sessionPersistenceManager.persistSession(sessionId, sessionIndexId,
+                            authnReqDTO.getLoggedInTenantDomain());
                 }
 
                 if (authMode.equals(SAMLSSOConstants.AuthnModes.USERNAME_PASSWORD)) {
@@ -144,7 +147,8 @@ public class IdPInitSSOAuthnRequestProcessor implements SSOAuthnRequestProcessor
                     sessionPersistenceManager.persistSession(sessionIndexId,
                             authnReqDTO.getUser().getAuthenticatedSubjectIdentifier(), spDO,
                             authnReqDTO.getRpSessionId(), authnReqDTO.getIssuer(),
-                            authnReqDTO.getAssertionConsumerURL());
+                            authnReqDTO.getAssertionConsumerURL(),
+                            authnReqDTO.getLoggedInTenantDomain());
                 }
 
                 // Build the response for the successful scenario
@@ -202,7 +206,7 @@ public class IdPInitSSOAuthnRequestProcessor implements SSOAuthnRequestProcessor
             SAMLSSORespDTO errorResp =
                     buildErrorResponse(authnReqDTO.getId(),
                             statusCodes,
-                            "Authentication Failure, invalid username or password.", null);
+                            "Error processing the authentication request.", null);
             errorResp.setLoginPageURL(authnReqDTO.getLoginPageURL());
             errorResp.setAssertionConsumerURL(authnReqDTO.getAssertionConsumerURL());
             return errorResp;

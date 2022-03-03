@@ -304,7 +304,7 @@ public class SAMLSSOConfigAdmin {
         serviceProviderDO.setDoValidateSignatureInArtifactResolve(serviceProviderDTO
                 .isDoValidateSignatureInArtifactResolve());
         if (serviceProviderDTO.getNameIDFormat() == null) {
-            serviceProviderDTO.setNameIDFormat(NameIdentifier.EMAIL);
+            serviceProviderDTO.setNameIDFormat(NameIdentifier.UNSPECIFIED);
         } else {
             serviceProviderDTO.setNameIDFormat(serviceProviderDTO.getNameIDFormat().replace("/", ":"));
         }
@@ -415,7 +415,7 @@ public class SAMLSSOConfigAdmin {
                 .isDoValidateSignatureInArtifactResolve());
 
         if (serviceProviderDO.getNameIDFormat() == null) {
-            serviceProviderDO.setNameIDFormat(NameIdentifier.EMAIL);
+            serviceProviderDO.setNameIDFormat(NameIdentifier.UNSPECIFIED);
         } else {
             serviceProviderDO.setNameIDFormat(serviceProviderDO.getNameIDFormat().replace("/", ":"));
         }
