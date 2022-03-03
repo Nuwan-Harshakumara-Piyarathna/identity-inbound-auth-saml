@@ -79,6 +79,7 @@ import org.wso2.carbon.identity.core.persistence.IdentityPersistenceManager;
 import org.wso2.carbon.identity.core.util.IdentityTenantUtil;
 import org.wso2.carbon.identity.core.util.IdentityUtil;
 import org.wso2.carbon.identity.saml.common.util.SAMLInitializer;
+import org.wso2.carbon.identity.sso.saml.SAMLSSOConfigService;
 import org.wso2.carbon.identity.sso.saml.SAMLSSOConfigServiceImpl;
 import org.wso2.carbon.identity.sso.saml.SAMLSSOConstants;
 import org.wso2.carbon.identity.sso.saml.SSOServiceProviderConfigManager;
@@ -1364,7 +1365,7 @@ public class SAMLSSOUtil {
 
         if (spDO == null) {
 
-            spDO = getSAMLServiceProviderFromRegistry(authnReqDTO.getIssuer(), authnReqDTO.getTenantDomain());
+            spDO = getSAMLServiceProviderJDBC(authnReqDTO.getIssuer(), authnReqDTO.getTenantDomain());
         }
 
         if (!authnReqDTO.isIdPInitSSOEnabled()) {
@@ -1816,10 +1817,11 @@ public class SAMLSSOUtil {
             privilegedCarbonContext.setTenantDomain(tenantDomain);
 
             IdentityTenantUtil.initializeRegistry(tenantId, tenantDomain);
-            IdentityPersistenceManager persistenceManager = IdentityPersistenceManager.getPersistanceManager();
-            Registry registry = (Registry) PrivilegedCarbonContext.getThreadLocalCarbonContext().getRegistry
-                    (RegistryType.SYSTEM_CONFIGURATION);
-            return persistenceManager.isServiceProviderExists(registry, issuerName);
+//            IdentityPersistenceManager persistenceManager = IdentityPersistenceManager.getPersistanceManager();
+//            Registry registry = (Registry) PrivilegedCarbonContext.getThreadLocalCarbonContext().getRegistry
+//                    (RegistryType.SYSTEM_CONFIGURATION);
+            SAMLSSOConfigService samlssoConfigService = new SAMLSSOConfigService();
+            return samlssoConfigService.isServiceProviderExists(issuerName,tenantId);
         } catch (IdentityException e) {
             throw new IdentitySAML2SSOException("Error occurred while validating existence of SAML service provider " +
                     "'" + issuerName + "' in the tenant domain '" + tenantDomain + "'");
@@ -1875,9 +1877,11 @@ public class SAMLSSOUtil {
             privilegedCarbonContext.setTenantDomain(tenantDomain);
 
             IdentityPersistenceManager persistenceManager = IdentityPersistenceManager.getPersistanceManager();
-            Registry registry = (Registry) PrivilegedCarbonContext.getThreadLocalCarbonContext().getRegistry
-                    (RegistryType.SYSTEM_CONFIGURATION);
-            SAMLSSOServiceProviderDO spDO=persistenceManager.getServiceProvider(registry, issuerName);
+//            Registry registry = (Registry) PrivilegedCarbonContext.getThreadLocalCarbonContext().getRegistry
+//                    (RegistryType.SYSTEM_CONFIGURATION);
+//            SAMLSSOServiceProviderDO spDO=persistenceManager.getServiceProvider(registry, issuerName);
+            SAMLSSOConfigService samlssoConfigService = new SAMLSSOConfigService();
+            SAMLSSOServiceProviderDO spDO=samlssoConfigService.getServiceProviderDO(issuerName);
             if (StringUtils.isBlank(requestedACSUrl) || !spDO.getAssertionConsumerUrlList().contains
                     (requestedACSUrl)) {
                 String msg = "ALERT: Invalid Assertion Consumer URL value '" + requestedACSUrl + "' in the " +
@@ -2170,7 +2174,7 @@ public class SAMLSSOUtil {
             return serviceProvider;
         }
 
-        return getSAMLServiceProviderFromRegistry(issuerName, tenantDomain);
+        return getSAMLServiceProviderJDBC(issuerName, tenantDomain);
     }
 
     /**
@@ -2439,7 +2443,7 @@ public class SAMLSSOUtil {
                         "SAML service providers registered in tenant domain : " + tenantDomain);
             }
 
-            serviceProviderConfigs = getSAMLServiceProviderFromRegistry(issuer, tenantDomain);
+            serviceProviderConfigs = getSAMLServiceProviderJDBC(issuer, tenantDomain);
         }
 
         return serviceProviderConfigs;
@@ -2603,7 +2607,33 @@ public class SAMLSSOUtil {
             IdentityPersistenceManager persistenceManager = IdentityPersistenceManager.getPersistanceManager();
             Registry registry = (Registry) PrivilegedCarbonContext.getThreadLocalCarbonContext().
                     getRegistry(RegistryType.SYSTEM_CONFIGURATION);
-            return persistenceManager.getServiceProvider(registry, issuer);
+            return persistenceManager.getServiceProvider(registry,issuer);
+
+        } catch (IdentityException | RegistryException e) {
+            throw new IdentitySAML2SSOException("Error occurred while retrieving SAML service provider for "
+                    + "issuer : " + issuer + " in tenant domain : " + tenantDomain);
+        } finally {
+            PrivilegedCarbonContext.endTenantFlow();
+        }
+    }
+
+    public static SAMLSSOServiceProviderDO getSAMLServiceProviderJDBC(String issuer, String tenantDomain)
+            throws IdentitySAML2SSOException {
+
+        if (StringUtils.isBlank(tenantDomain)) {
+            tenantDomain = MultitenantConstants.SUPER_TENANT_DOMAIN_NAME;
+        }
+
+        int tenantId = getTenantIdFromDomain(tenantDomain);
+        try {
+            PrivilegedCarbonContext.startTenantFlow();
+            PrivilegedCarbonContext privilegedCarbonContext = PrivilegedCarbonContext.getThreadLocalCarbonContext();
+            privilegedCarbonContext.setTenantId(tenantId);
+            privilegedCarbonContext.setTenantDomain(tenantDomain);
+
+            IdentityTenantUtil.getTenantRegistryLoader().loadTenantRegistry(tenantId);
+            SAMLSSOConfigService samlssoConfigService = new SAMLSSOConfigService();
+            return samlssoConfigService.getServiceProviderDO(issuer);
 
         } catch (IdentityException | RegistryException e) {
             throw new IdentitySAML2SSOException("Error occurred while retrieving SAML service provider for "

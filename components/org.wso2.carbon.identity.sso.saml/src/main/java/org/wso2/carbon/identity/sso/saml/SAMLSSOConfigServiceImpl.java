@@ -28,6 +28,7 @@ import org.wso2.carbon.core.util.KeyStoreUtil;
 import org.wso2.carbon.identity.application.common.util.IdentityApplicationManagementUtil;
 import org.wso2.carbon.identity.base.IdentityConstants;
 import org.wso2.carbon.identity.base.IdentityException;
+import org.wso2.carbon.identity.core.model.SAMLSSOServiceProviderDO;
 import org.wso2.carbon.identity.core.util.IdentityTenantUtil;
 import org.wso2.carbon.identity.core.util.IdentityUtil;
 import org.wso2.carbon.identity.sso.saml.admin.SAMLSSOConfigAdmin;
@@ -234,10 +235,10 @@ public class SAMLSSOConfigServiceImpl {
      * @return SAMLSSOServiceProviderDTO containing service provider configurations.
      * @throws IdentityException
      */
-    public SAMLSSOServiceProviderDTO getServiceProvider(String issuer) throws IdentityException {
+    public SAMLSSOServiceProviderDTO getServiceProviderDTO(String issuer) throws IdentityException {
 
         SAMLSSOConfigAdmin configAdmin = new SAMLSSOConfigAdmin(getConfigSystemRegistry());
-        SAMLSSOServiceProviderDTO sp = configAdmin.getServiceProviderByIssuer(issuer);
+        SAMLSSOServiceProviderDTO sp = configAdmin.getServiceProviderDTOByIssuer(issuer);
         if(sp == null){
             if (log.isDebugEnabled()) {
                 log.debug("SAML SP not found for issuer: " + issuer + " in tenantDomain: " + getTenantDomain());
@@ -245,6 +246,26 @@ public class SAMLSSOConfigServiceImpl {
             return null;
         }
         return sp;
+    }
+
+    public SAMLSSOServiceProviderDO getServiceProviderDO(String issuer) throws IdentityException {
+
+        SAMLSSOConfigAdmin configAdmin = new SAMLSSOConfigAdmin(getConfigSystemRegistry());
+        SAMLSSOServiceProviderDO sp = configAdmin.getServiceProviderDOByIssuer(issuer);
+        if(sp == null){
+            if (log.isDebugEnabled()) {
+                log.debug("SAML SP not found for issuer: " + issuer + " in tenantDomain: " + getTenantDomain());
+            }
+            return null;
+        }
+        return sp;
+    }
+
+    public boolean isServiceProviderExists(String issuer,String tenant_id) throws IdentityException {
+
+        SAMLSSOConfigAdmin configAdmin = new SAMLSSOConfigAdmin(getConfigSystemRegistry());
+        SAMLSSOServiceProviderDTO sp = configAdmin.getServiceProviderDTOByIssuer(issuer);
+        return sp != null;
     }
 
     /**

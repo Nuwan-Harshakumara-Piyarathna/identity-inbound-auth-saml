@@ -22,6 +22,7 @@ import org.apache.commons.logging.Log;
 import org.apache.commons.logging.LogFactory;
 import org.wso2.carbon.core.AbstractAdmin;
 import org.wso2.carbon.identity.base.IdentityException;
+import org.wso2.carbon.identity.core.model.SAMLSSOServiceProviderDO;
 import org.wso2.carbon.identity.sso.saml.dto.SAMLSSOServiceProviderDTO;
 import org.wso2.carbon.identity.sso.saml.dto.SAMLSSOServiceProviderInfoDTO;
 import org.wso2.carbon.identity.sso.saml.exception.IdentitySAML2ClientException;
@@ -81,10 +82,28 @@ public class SAMLSSOConfigService extends AbstractAdmin {
      * @return SAMLSSOServiceProviderDTO containing service provider configurations.
      * @throws IdentityException
      */
-    public SAMLSSOServiceProviderDTO getServiceProvider(String issuer) throws IdentityException {
+    public SAMLSSOServiceProviderDTO getServiceProviderDTO(String issuer) throws IdentityException {
 
         try {
-            return samlSSOConfigServiceImpl.getServiceProvider(issuer);
+            return samlSSOConfigServiceImpl.getServiceProviderDTO(issuer);
+        } catch (IdentityException ex) {
+            throw handleException(ex);
+        }
+    }
+
+    public SAMLSSOServiceProviderDO getServiceProviderDO(String issuer) throws IdentityException {
+
+        try {
+            return samlSSOConfigServiceImpl.getServiceProviderDO(issuer);
+        } catch (IdentityException ex) {
+            throw handleException(ex);
+        }
+    }
+
+    public boolean isServiceProviderExists(String issuer,String tenant_id) throws IdentityException {
+
+        try {
+            return samlSSOConfigServiceImpl.isServiceProviderExists(issuer,tenant_id);
         } catch (IdentityException ex) {
             throw handleException(ex);
         }
