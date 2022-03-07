@@ -264,7 +264,7 @@ public class SAMLSSOConfigServiceImpl {
         return sp;
     }
 
-    public boolean isServiceProviderExists(String issuer,String tenant_id) throws IdentityException {
+    public boolean isServiceProviderExists(String issuer,int tenant_id) throws IdentityException {
 
         SAMLSSOConfigAdmin configAdmin = new SAMLSSOConfigAdmin(getConfigSystemRegistry());
         SAMLSSOServiceProviderDTO sp = configAdmin.getServiceProviderDTOByIssuer(issuer);
@@ -513,6 +513,10 @@ public class SAMLSSOConfigServiceImpl {
     private IdentitySAML2ClientException buildClientException(Error error, String message) {
 
         return new IdentitySAML2ClientException(error.getErrorCode(), message);
+    }
+
+    public SAMLSSOServiceProviderDTO getServiceProvider(String issuerToBeDeleted) throws IdentityException {
+        return getServiceProviderDTO(issuerToBeDeleted);
     }
 }
 

@@ -100,7 +100,7 @@ public class SAMLSSOConfigService extends AbstractAdmin {
         }
     }
 
-    public boolean isServiceProviderExists(String issuer,String tenant_id) throws IdentityException {
+    public boolean isServiceProviderExists(String issuer,int tenant_id) throws IdentityException {
 
         try {
             return samlSSOConfigServiceImpl.isServiceProviderExists(issuer,tenant_id);
