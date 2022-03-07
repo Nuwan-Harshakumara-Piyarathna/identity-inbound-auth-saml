@@ -700,57 +700,9 @@ public class SAMLSSOConfigAdmin {
         return samlssoServiceProviderDTO;
     }
 
-    public SAMLSSOServiceProviderDO getServiceProviderDOByIssuer(String issuer) {
+    public SAMLSSOServiceProviderDO getServiceProviderDOByIssuer(String issuer) throws IdentityException {
         SAMLSSOServiceProviderDTO dto = getServiceProviderDTOByIssuer(issuer);
-        return dtoToDo(dto);
+        return createSAMLSSOServiceProviderDO(dto);
     }
-
-    public SAMLSSOServiceProviderDO dtoToDo(SAMLSSOServiceProviderDTO dto){
-        SAMLSSOServiceProviderDO samlSsoDo = new SAMLSSOServiceProviderDO();
-        samlSsoDo.setIssuer(dto.getIssuer());
-        samlSsoDo.setIssuerQualifier(dto.getIssuerQualifier());
-        samlSsoDo.setAssertionConsumerUrl(dto.getAssertionConsumerUrl());
-        samlSsoDo.setAssertionConsumerUrls(dto.getAssertionConsumerUrls());
-        samlSsoDo.setAssertionConsumerUrls(Arrays.asList(dto.getAssertionConsumerUrls()));
-        samlSsoDo.setDefaultAssertionConsumerUrl(dto.getDefaultAssertionConsumerUrl());
-        samlSsoDo.setCertAlias(dto.getCertAlias());
-        samlSsoDo.setSloResponseURL(dto.getSloResponseURL());
-        samlSsoDo.setSloRequestURL(dto.getSloRequestURL());
-        samlSsoDo.setDoSingleLogout(dto.isDoSingleLogout());
-        samlSsoDo.setLoginPageURL(dto.getLoginPageURL());
-        samlSsoDo.setDoSignResponse(dto.isDoSignResponse());
-        samlSsoDo.setDoSignAssertions(dto.isDoSignAssertions());
-        samlSsoDo.setAttributeConsumingServiceIndex(dto.getAttributeConsumingServiceIndex());
-        samlSsoDo.setRequestedClaims(dto.getRequestedClaims());
-        samlSsoDo.setRequestedClaims(Arrays.asList(dto.getRequestedClaims()));
-        samlSsoDo.setRequestedAudiences(dto.getRequestedAudiences());
-        samlSsoDo.setRequestedAudiences(Arrays.asList(dto.getRequestedAudiences()));
-        samlSsoDo.setRequestedRecipients(dto.getRequestedRecipients());
-        samlSsoDo.setRequestedRecipients(Arrays.asList(dto.getRequestedRecipients()));
-        samlSsoDo.setEnableAttributesByDefault(dto.isEnableAttributesByDefault());
-        samlSsoDo.setNameIdClaimUri(dto.getNameIdClaimUri());
-        samlSsoDo.setNameIDFormat(dto.getNameIDFormat());
-        samlSsoDo.setIdPInitSSOEnabled(dto.isIdPInitSSOEnabled());
-        samlSsoDo.setIdPInitSLOEnabled(dto.isIdPInitSLOEnabled());
-        samlSsoDo.setIdpInitSLOReturnToURLs(dto.getIdpInitSLOReturnToURLs());
-        samlSsoDo.setIdpInitSLOReturnToURLs(Arrays.asList(dto.getIdpInitSLOReturnToURLs()));
-        samlSsoDo.setDoEnableEncryptedAssertion(dto.isDoEnableEncryptedAssertion());
-        samlSsoDo.setDoValidateSignatureInRequests(dto.isDoValidateSignatureInRequests());
-        samlSsoDo.setDoValidateSignatureInArtifactResolve(dto.isDoValidateSignatureInArtifactResolve());
-        samlSsoDo.setSigningAlgorithmUri(dto.getSigningAlgorithmURI());
-        samlSsoDo.setDigestAlgorithmUri(dto.getDigestAlgorithmURI());
-        samlSsoDo.setAssertionEncryptionAlgorithmUri(dto.getAssertionEncryptionAlgorithmURI());
-        samlSsoDo.setKeyEncryptionAlgorithmUri(dto.getKeyEncryptionAlgorithmURI());
-//        samlSsoDo.setSigningCertificate(dto.getS);
-        samlSsoDo.setAssertionQueryRequestProfileEnabled(dto.isAssertionQueryRequestProfileEnabled());
-        samlSsoDo.setSupportedAssertionQueryRequestTypes(dto.getSupportedAssertionQueryRequestTypes());
-        samlSsoDo.setEnableSAML2ArtifactBinding(dto.isEnableSAML2ArtifactBinding());
-        samlSsoDo.setIdpEntityIDAlias(dto.getIdpEntityIDAlias());
-        samlSsoDo.setDoFrontChannelLogout(dto.isDoFrontChannelLogout());
-        samlSsoDo.setFrontChannelLogoutBinding(dto.getFrontChannelLogoutBinding());
-
-        return samlSsoDo;
-    }
-
 
 }
